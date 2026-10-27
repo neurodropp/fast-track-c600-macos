@@ -1,25 +1,20 @@
 #!/bin/sh
-# Install the development HAL driver. Run as administrator.
+# Stage from the user's workspace before elevation; macOS may protect Documents.
 set -eu
-if [ "$(id -u)" -ne 0 ]; then
-    echo "Run with administrator privileges" >&2
+if [ "$(id -u)" -eq 0 ]; then
+    echo "Run this script without sudo; it requests elevation after staging" >&2
     exit 1
 fi
-source_bundle="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)/build/cmake/FastTrackC600.driver"
-target_dir="/Library/Audio/Plug-Ins/HAL"
-target_bundle="$target_dir/FastTrackC600.driver"
+project_dir="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+source_bundle="$project_dir/build/cmake/FastTrackC600.driver"
 if [ ! -f "$source_bundle/Contents/MacOS/FastTrackC600" ]; then
     echo "Build the driver first with cmake" >&2
     exit 1
 fi
 /usr/bin/codesign --verify --deep --strict "$source_bundle"
-if [ -e "$target_bundle" ]; then
-    echo "Driver already installed; run scripts/uninstall.sh before reinstalling" >&2
-    exit 1
-fi
-/bin/mkdir -p "$target_dir"
-/bin/cp -R "$source_bundle" "$target_bundle"
-/usr/sbin/chown -R root:wheel "$target_bundle"
-/bin/chmod -R a+rX "$target_bundle"
-/usr/bin/killall coreaudiod 2>/dev/null || true
-echo "Installed $target_bundle; Core Audio restarted"
+stage_dir="$(/usr/bin/mktemp -d /private/tmp/fasttrackc600-install.XXXXXX)"
+trap '/bin/rm -rf "$stage_dir"' EXIT HUP INT TERM
+/bin/cp -R "$source_bundle" "$stage_dir/FastTrackC600.driver"
+/bin/cp "$project_dir/scripts/install-root.sh" "$stage_dir/install-root.sh"
+/bin/chmod -R a+rX "$stage_dir"
+/usr/bin/sudo /bin/sh "$stage_dir/install-root.sh" "$stage_dir/FastTrackC600.driver"

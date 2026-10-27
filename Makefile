@@ -3,7 +3,7 @@ CFLAGS := -std=c11 -Wall -Wextra -Werror -O2
 FRAMEWORKS := -framework CoreFoundation -framework IOKit
 
 .PHONY: all clean
-all: build/c600-probe build/c600-capture-check
+all: build/c600-probe build/c600-capture-check build/c600-hal-io-check
 
 build/c600-probe: src/usb_probe.c
 	mkdir -p build
@@ -12,6 +12,10 @@ build/c600-probe: src/usb_probe.c
 build/c600-capture-check: src/usb_capture_check.c
 	mkdir -p build
 	$(CC) $(CFLAGS) -o $@ $< $(FRAMEWORKS)
+
+build/c600-hal-io-check: tools/hal_io_check.c
+	mkdir -p build
+	$(CC) $(CFLAGS) -o $@ $< -framework CoreAudio -framework CoreFoundation
 
 clean:
 	rm -rf build

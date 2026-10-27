@@ -1,13 +1,13 @@
 #!/bin/sh
-# Remove only this project's HAL driver. Run as administrator.
+# Stage the privileged removal script outside protected user folders.
 set -eu
-if [ "$(id -u)" -ne 0 ]; then
-    echo "Run with administrator privileges" >&2
+if [ "$(id -u)" -eq 0 ]; then
+    echo "Run this script without sudo; it requests elevation after staging" >&2
     exit 1
 fi
-target_bundle="/Library/Audio/Plug-Ins/HAL/FastTrackC600.driver"
-if [ -e "$target_bundle" ]; then
-    /bin/rm -rf "$target_bundle"
-fi
-/usr/bin/killall coreaudiod 2>/dev/null || true
-echo "Removed $target_bundle; Core Audio restarted"
+project_dir="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+stage_dir="$(/usr/bin/mktemp -d /private/tmp/fasttrackc600-uninstall.XXXXXX)"
+trap '/bin/rm -rf "$stage_dir"' EXIT HUP INT TERM
+/bin/cp "$project_dir/scripts/uninstall-root.sh" "$stage_dir/uninstall-root.sh"
+/bin/chmod a+r "$stage_dir/uninstall-root.sh"
+/usr/bin/sudo /bin/sh "$stage_dir/uninstall-root.sh"

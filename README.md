@@ -1,77 +1,116 @@
-# Fast Track C600 su Apple Silicon
+# Fast Track C600 on Apple Silicon
 
-[English](README.en.md)
+[Italiano](README.it.md)
 
-Progetto aperto per riportare la M-Audio Fast Track C600 su macOS moderno.
-**Stato attuale: il driver Core Audio sperimentale compila e il suo motore USB
-funziona sulla C600; l'installazione e l'audio udibile non sono ancora qualificati.**
+Open development project for the M-Audio Fast Track C600 (`0763:2031`) on
+modern macOS. **Current status: the experimental Core Audio driver is installed
+and recognized on one M3 Pro Mac running macOS 15.6.1. Silent Core Audio input
+and output have passed a two-second test. Audible playback and microphone
+recording still need physical verification.**
 
 ```sh
 make
-./build/c600-probe
-./build/c600-capture-check
-./build/c600-capture-check --duplex
+./build/c600-probe          # read-only USB descriptor and clock probe
+./build/c600-capture-check  # 2-second capture transport check, no audio saved
+./build/c600-capture-check --duplex  # also send silent output packets
 ```
 
-`c600-probe` legge descrittori e clock senza cambiare lo stato del dispositivo.
-`c600-capture-check` seleziona temporaneamente il clock interno a 48 kHz,
-riceve due secondi di pacchetti audio USB e mostra solo statistiche; non salva
-l'audio. Con `--duplex` invia anche pacchetti di uscita silenziosi, sincronizzati
-al conteggio dei campioni in ingresso. Richiede la C600 collegata e non deve
-essere eseguito mentre un altro driver usa la scheda.
+The capture check temporarily selects the internal 48 kHz clock. The duplex
+mode sends silence using capture packet counts for implicit feedback. It should
+not run concurrently with another driver using the interface. Build requires
+Xcode Command Line Tools or Xcode.
 
-## Stato della diagnosi (27 ottobre 2026)
+## Hardware findings
 
-Mac di prova: MacBook Pro M3 Pro, macOS 15.6.1, architettura arm64.
-Interfaccia: M-Audio Fast Track C600, USB VID:PID `0763:2031`, collegata tramite hub e alimentata solo via USB.
+Without a custom driver, the C600 enumerates on USB but does not appear in
+Core Audio because its audio streaming interfaces use vendor-specific class
+`0xff`. The device
+descriptors expose 8 output and 6 input channels of 24-bit PCM. Linux already
+supports this USB ID, including the implicit feedback relationship between
+capture endpoint `0x81` and playback endpoint `0x01`.
 
-- macOS rileva il dispositivo USB, ma non lo elenca fra i dispositivi Core Audio.
-- Nessun driver Avid/M-Audio risulta installato in `/Library/Audio/Plug-Ins/HAL` o `/Library/Extensions`.
-- La configurazione USB ha interfacce audio con classe `0xff` (vendor-specific), anziché la classe USB Audio che il driver Apple associa automaticamente.
-- Il descrittore indica streaming a 8 canali in uscita (`endpoint 0x01`, interfaccia 2, alternate setting 1) e 6 canali in ingresso (`endpoint 0x81`, interfaccia 3, alternate setting 1), PCM a 24 bit.
-- Sono presenti anche una interfaccia MIDI standard (interfaccia 4), una HID (5) e una DFU (0). La presenza della DFU non dimostra che serva un aggiornamento firmware.
-- La versione USB `bcdDevice=0x0017`, mostrata dal profilo sistema come `0.17`, non va interpretata senza documentazione come versione firmware.
-- Lo strumento `c600-probe` ha letto il selettore clock su S/PDIF a 48 kHz prima dei test.
-- `c600-capture-check` ha ricevuto 15.984 pacchetti, 1.726.812 byte, zero errori in due secondi: circa 1,999 s di audio 6 canali / 24 bit / 48 kHz. Non è stato registrato il contenuto audio.
-- La prova duplex silenziosa ha ricevuto 15.992 pacchetti e inviato 15.968 pacchetti, senza errori. Il risultato si è ripetuto in tre esecuzioni consecutive.
-- Il motore USB usato dal driver ha ricevuto 19.440 pacchetti e inviato 19.424 pacchetti, senza errori, in una prova autonoma di circa 2,4 secondi.
+On the tested unit, the capture check received 15,984 packets and 1,726,812
+bytes in two seconds, with zero packet or submission errors. This is about
+1.999 seconds of 6-channel, 24-bit, 48 kHz audio. No audio content was saved.
+The silent duplex check received 15,992 packets and sent 15,968 packets with
+zero packet errors; the result repeated across three consecutive runs.
 
-## Driver sperimentale
+## Installation (experimental)
 
-Il driver usa [libASPL](https://github.com/gavv/libASPL) (MIT, come submodule Git)
-e per ora offre 48 kHz fissi, 6 ingressi e 8 uscite. Converte il PCM USB a 24 bit
-in Float32 per Core Audio. Il bundle compila, supera la verifica della firma e
-carica l'entry point; resta da verificare l'integrazione con Core Audio installato.
+Requirements: a Mac with macOS 12 or newer, Xcode Command Line Tools or Xcode,
+CMake, and the Fast Track C600 connected by USB. Only macOS 15.6.1 on M3 Pro
+has been tested so far. The C600 can run from USB power, but its analog inputs
+3–4, analog outputs 5–6, and second headphone output require the original
+5 V / 2 A external supply.
+
+1. Clone and build:
+
+   ```sh
+   git clone --recurse-submodules https://github.com/neurodropp/fast-track-c600-macos.git
+   cd fast-track-c600-macos
+   cmake -S . -B build/cmake -DCMAKE_BUILD_TYPE=Release
+   cmake --build build/cmake --parallel
+   ```
+
+2. Install. Run this **without** `sudo`; the script copies the signed bundle to
+   a temporary location before asking for an administrator password. This
+   avoids macOS privacy restrictions on the Documents folder.
+
+   ```sh
+   ./scripts/install.sh
+   ```
+
+3. Open **Audio MIDI Setup** or **System Settings → Sound**. “Fast Track C600”
+   should appear as a USB device with 6 inputs, 8 outputs, and 48 kHz. For a
+   silent Core Audio I/O test:
+
+   ```sh
+   make build/c600-hal-io-check
+   ./build/c600-hal-io-check
+   ```
+
+4. To remove the experimental driver:
+
+   ```sh
+   ./scripts/uninstall.sh
+   ```
+
+The install and uninstall scripts restart Core Audio, which may briefly
+interrupt audio in other applications. The driver does not modify firmware or
+macOS security settings.
+
+## Current driver scope
+
+The driver uses [libASPL](https://github.com/gavv/libASPL) (MIT, included as a
+Git submodule) and supports one fixed 48 kHz mode: 6 input and 8 output
+channels, 24-bit USB PCM converted to 32-bit float for Core Audio. The USB
+engine streamed about 2.4 seconds of full duplex audio with zero errors in a
+standalone test. The installed driver appears in Core Audio and completed 535
+silent I/O cycles in a two-second test, with nonempty input and output buffers.
 
 ```sh
-git clone --recurse-submodules https://github.com/neurodropp/fast-track-c600-macos.git
-cd fast-track-c600-macos
-cmake -S . -B build/cmake -DCMAKE_BUILD_TYPE=Release
-cmake --build build/cmake --parallel
-./build/cmake/c600-engine-check
+./build/cmake/c600-engine-check   # hardware transport test, sends silence
 ./build/cmake/c600-plugin-check ./build/cmake/FastTrackC600.driver/Contents/MacOS/FastTrackC600
-sudo ./scripts/install.sh
-sudo ./scripts/uninstall.sh
 ```
 
-Mancano ancora gestione della riconnessione, cambio frequenza e test di durata.
-Il buffer audio tra Core Audio e USB richiede una prova fisica di ascolto e
-registrazione prima di considerare il driver affidabile.
+The driver currently lacks hot-plug handling, sample-rate switching, and
+long-session timing qualification. Its FIFO audio bridge needs a physical
+loopback test before recording or playback quality can be claimed. Use the
+uninstall script if Core Audio behaves unexpectedly.
 
-Il kernel Linux include già il supporto per questa unità tramite una quirk USB audio: 8 uscite, 6 ingressi, 24 bit, 44,1/48/88,2/96 kHz e feedback implicito dal flusso di acquisizione. Questo conferma che il protocollo audio attuale è utilizzabile senza un firmware specifico per Apple Silicon.
+Next: validate the installed Core Audio driver with real playback and input,
+then test long-session timing, rate switching, and reconnect behavior. Firmware work
+is deferred until there is evidence of a firmware defect and a recovery path.
 
-## Direzione del progetto
+## Prior work and license
 
-1. Sviluppare un driver Core Audio per `0763:2031` che gestisca streaming USB isocrono in entrambe le direzioni e clock, inizialmente senza toccare il firmware.
-2. Verificare sul dispositivo reale enumerazione, riproduzione, registrazione, cambio sample rate e riconnessione.
-3. Aggiungere mixer, routing e controlli hardware dopo aver reso stabile lo streaming.
-4. Valutare il firmware solo se emerge un limite dimostrato e dopo aver ottenuto immagine originale e procedura di recupero.
+As of 27 October 2026, we found no public Core Audio driver for the C600.
+[`c600gui`](https://github.com/obijywk/c600gui) is a control panel and
+[`maudio_fast_track_c400`](https://github.com/ruslanvakhitov/maudio_fast_track_c400)
+is a driver for the related C400. Neither repository declares a reuse license,
+so no code from either is included here. The original code in this repository
+is licensed under [MIT](LICENSE).
 
-Una ricerca su GitHub del 27 ottobre 2026 non ha trovato un driver Core Audio pubblico per C600. Esiste [c600gui](https://github.com/obijywk/c600gui), un pannello di controllo, e [FastTrackC400](https://github.com/ruslanvakhitov/maudio_fast_track_c400), un driver per il modello C400. Entrambi non contengono una licenza esplicita: il loro codice non è incluso qui. Gli strumenti USB in questo repository sono originali e distribuiti sotto MIT.
-
-## Fonti
-
-- [Driver ufficiali Avid C600](https://kb.avid.com/pkb/articles/en_US/Knowledge/Fast-Track-C600-Drivers)
-- [Quirk Linux per il C600](https://cos.googlesource.com/third_party/kernel/+/a65a6e1004cb6e445657dc2519022115fbde0c90/sound/usb/quirks-table.h)
-- [Feedback implicito nel driver Linux](https://github.com/torvalds/linux/blob/master/sound/usb/implicit.c)
-- [Manuale C600](https://device.report/m/7b0a5076eb6dae351f7a3bad5fb9359b5ef970348f67fc1a0edbd61313fba16d.pdf)
+Protocol references: [Linux C600 USB audio quirk](https://cos.googlesource.com/third_party/kernel/+/a65a6e1004cb6e445657dc2519022115fbde0c90/sound/usb/quirks-table.h),
+[Linux implicit feedback](https://github.com/torvalds/linux/blob/master/sound/usb/implicit.c),
+[Avid's legacy drivers](https://kb.avid.com/pkb/articles/en_US/Knowledge/Fast-Track-C600-Drivers).
