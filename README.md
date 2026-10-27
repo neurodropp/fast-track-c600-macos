@@ -9,13 +9,15 @@ Progetto aperto per riportare la M-Audio Fast Track C600 su macOS moderno.
 make
 ./build/c600-probe
 ./build/c600-capture-check
+./build/c600-capture-check --duplex
 ```
 
 `c600-probe` legge descrittori e clock senza cambiare lo stato del dispositivo.
 `c600-capture-check` seleziona temporaneamente il clock interno a 48 kHz,
 riceve due secondi di pacchetti audio USB e mostra solo statistiche; non salva
-né riproduce l'audio. Richiede la C600 collegata e non deve essere eseguito
-mentre un altro driver usa la scheda.
+l'audio. Con `--duplex` invia anche pacchetti di uscita silenziosi, sincronizzati
+al conteggio dei campioni in ingresso. Richiede la C600 collegata e non deve
+essere eseguito mentre un altro driver usa la scheda.
 
 ## Stato della diagnosi (27 ottobre 2026)
 
@@ -30,6 +32,7 @@ Interfaccia: M-Audio Fast Track C600, USB VID:PID `0763:2031`, collegata tramite
 - La versione USB `bcdDevice=0x0017`, mostrata dal profilo sistema come `0.17`, non va interpretata senza documentazione come versione firmware.
 - Lo strumento `c600-probe` ha letto il selettore clock su S/PDIF a 48 kHz prima dei test.
 - `c600-capture-check` ha ricevuto 15.984 pacchetti, 1.726.812 byte, zero errori in due secondi: circa 1,999 s di audio 6 canali / 24 bit / 48 kHz. Non è stato registrato il contenuto audio.
+- La prova duplex silenziosa ha ricevuto 15.992 pacchetti e inviato 15.968 pacchetti, senza errori. Il risultato si è ripetuto in tre esecuzioni consecutive.
 
 Il kernel Linux include già il supporto per questa unità tramite una quirk USB audio: 8 uscite, 6 ingressi, 24 bit, 44,1/48/88,2/96 kHz e feedback implicito dal flusso di acquisizione. Questo conferma che il protocollo audio attuale è utilizzabile senza un firmware specifico per Apple Silicon.
 

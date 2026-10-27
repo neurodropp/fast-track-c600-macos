@@ -10,9 +10,11 @@ one M3 Pro Mac running macOS 15.6.1. A Core Audio driver is still in development
 make
 ./build/c600-probe          # read-only USB descriptor and clock probe
 ./build/c600-capture-check  # 2-second capture transport check, no audio saved
+./build/c600-capture-check --duplex  # also send silent output packets
 ```
 
-The capture check temporarily selects the internal 48 kHz clock. It should
+The capture check temporarily selects the internal 48 kHz clock. The duplex
+mode sends silence using capture packet counts for implicit feedback. It should
 not run concurrently with another driver using the interface. Build requires
 Xcode Command Line Tools or Xcode.
 
@@ -27,6 +29,8 @@ capture endpoint `0x81` and playback endpoint `0x01`.
 On the tested unit, the capture check received 15,984 packets and 1,726,812
 bytes in two seconds, with zero packet or submission errors. This is about
 1.999 seconds of 6-channel, 24-bit, 48 kHz audio. No audio content was saved.
+The silent duplex check received 15,992 packets and sent 15,968 packets with
+zero packet errors; the result repeated across three consecutive runs.
 
 Next: validate silent playback transport, implement the Core Audio driver,
 then test actual audio, rate switching, and reconnect behavior. Firmware work
