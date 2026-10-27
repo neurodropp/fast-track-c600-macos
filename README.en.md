@@ -3,8 +3,9 @@
 [Italiano](README.md)
 
 Open development project for the M-Audio Fast Track C600 (`0763:2031`) on
-modern macOS. **Current status: USB diagnostics and capture transport work on
-one M3 Pro Mac running macOS 15.6.1. A Core Audio driver is still in development.**
+modern macOS. **Current status: an experimental Core Audio driver builds and
+its USB engine streams on one M3 Pro Mac running macOS 15.6.1. The installed
+driver and audible playback have not yet been qualified.**
 
 ```sh
 make
@@ -32,8 +33,33 @@ bytes in two seconds, with zero packet or submission errors. This is about
 The silent duplex check received 15,992 packets and sent 15,968 packets with
 zero packet errors; the result repeated across three consecutive runs.
 
-Next: validate silent playback transport, implement the Core Audio driver,
-then test actual audio, rate switching, and reconnect behavior. Firmware work
+## Experimental driver
+
+The driver uses [libASPL](https://github.com/gavv/libASPL) (MIT, included as a
+Git submodule) and supports one fixed 48 kHz mode: 6 input and 8 output
+channels, 24-bit USB PCM converted to 32-bit float for Core Audio. The USB
+engine has streamed about 2.4 seconds of full duplex audio with zero errors
+in a standalone test. The bundle builds, passes code-signature verification,
+and its entry point loads; Core Audio integration still needs a live test.
+
+```sh
+git clone --recurse-submodules https://github.com/neurodropp/fast-track-c600-macos.git
+cd fast-track-c600-macos
+cmake -S . -B build/cmake -DCMAKE_BUILD_TYPE=Release
+cmake --build build/cmake --parallel
+./build/cmake/c600-engine-check   # hardware transport test, sends silence
+./build/cmake/c600-plugin-check ./build/cmake/FastTrackC600.driver/Contents/MacOS/FastTrackC600
+sudo ./scripts/install.sh         # experimental system-wide HAL install
+sudo ./scripts/uninstall.sh       # remove this driver's bundle
+```
+
+The driver currently lacks hot-plug handling, sample-rate switching, and
+long-session timing qualification. Its FIFO audio bridge needs a physical
+loopback test before recording or playback quality can be claimed. Use the
+uninstall script if Core Audio behaves unexpectedly.
+
+Next: validate the installed Core Audio driver with real playback and input,
+then test long-session timing, rate switching, and reconnect behavior. Firmware work
 is deferred until there is evidence of a firmware defect and a recovery path.
 
 ## Prior work and license

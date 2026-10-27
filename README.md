@@ -3,7 +3,8 @@
 [English](README.en.md)
 
 Progetto aperto per riportare la M-Audio Fast Track C600 su macOS moderno.
-**Stato attuale: strumenti USB funzionanti; driver Core Audio ancora in sviluppo.**
+**Stato attuale: il driver Core Audio sperimentale compila e il suo motore USB
+funziona sulla C600; l'installazione e l'audio udibile non sono ancora qualificati.**
 
 ```sh
 make
@@ -33,6 +34,29 @@ Interfaccia: M-Audio Fast Track C600, USB VID:PID `0763:2031`, collegata tramite
 - Lo strumento `c600-probe` ha letto il selettore clock su S/PDIF a 48 kHz prima dei test.
 - `c600-capture-check` ha ricevuto 15.984 pacchetti, 1.726.812 byte, zero errori in due secondi: circa 1,999 s di audio 6 canali / 24 bit / 48 kHz. Non è stato registrato il contenuto audio.
 - La prova duplex silenziosa ha ricevuto 15.992 pacchetti e inviato 15.968 pacchetti, senza errori. Il risultato si è ripetuto in tre esecuzioni consecutive.
+- Il motore USB usato dal driver ha ricevuto 19.440 pacchetti e inviato 19.424 pacchetti, senza errori, in una prova autonoma di circa 2,4 secondi.
+
+## Driver sperimentale
+
+Il driver usa [libASPL](https://github.com/gavv/libASPL) (MIT, come submodule Git)
+e per ora offre 48 kHz fissi, 6 ingressi e 8 uscite. Converte il PCM USB a 24 bit
+in Float32 per Core Audio. Il bundle compila, supera la verifica della firma e
+carica l'entry point; resta da verificare l'integrazione con Core Audio installato.
+
+```sh
+git clone --recurse-submodules https://github.com/neurodropp/fast-track-c600-macos.git
+cd fast-track-c600-macos
+cmake -S . -B build/cmake -DCMAKE_BUILD_TYPE=Release
+cmake --build build/cmake --parallel
+./build/cmake/c600-engine-check
+./build/cmake/c600-plugin-check ./build/cmake/FastTrackC600.driver/Contents/MacOS/FastTrackC600
+sudo ./scripts/install.sh
+sudo ./scripts/uninstall.sh
+```
+
+Mancano ancora gestione della riconnessione, cambio frequenza e test di durata.
+Il buffer audio tra Core Audio e USB richiede una prova fisica di ascolto e
+registrazione prima di considerare il driver affidabile.
 
 Il kernel Linux include già il supporto per questa unità tramite una quirk USB audio: 8 uscite, 6 ingressi, 24 bit, 44,1/48/88,2/96 kHz e feedback implicito dal flusso di acquisizione. Questo conferma che il protocollo audio attuale è utilizzabile senza un firmware specifico per Apple Silicon.
 
