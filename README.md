@@ -69,6 +69,11 @@ has been tested so far. The C600 can run from USB power, but its analog inputs
    ./build/c600-hal-io-check
    ```
 
+   To check audible playback, connect speakers to analog outputs 1–2, start
+   with a low monitor level, and run `./build/c600-hal-io-check --tone`. It sends
+   a quiet 440 Hz tone for two seconds. The command's successful completion
+   confirms Core Audio callbacks, but only listening confirms analog output.
+
 4. To remove the experimental driver:
 
    ```sh
@@ -87,6 +92,8 @@ channels, 24-bit USB PCM converted to 32-bit float for Core Audio. The USB
 engine streamed about 2.4 seconds of full duplex audio with zero errors in a
 standalone test. The installed driver appears in Core Audio and completed 535
 silent I/O cycles in a two-second test, with nonempty input and output buffers.
+The 440 Hz output test also completed 534 callbacks without a Core Audio error;
+audibility has not yet been confirmed.
 
 ```sh
 ./build/cmake/c600-engine-check   # hardware transport test, sends silence

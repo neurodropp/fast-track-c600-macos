@@ -37,6 +37,7 @@ Interfaccia: M-Audio Fast Track C600, USB VID:PID `0763:2031`, collegata tramite
 - La prova duplex silenziosa ha ricevuto 15.992 pacchetti e inviato 15.968 pacchetti, senza errori. Il risultato si è ripetuto in tre esecuzioni consecutive.
 - Il motore USB usato dal driver ha ricevuto 19.440 pacchetti e inviato 19.424 pacchetti, senza errori, in una prova autonoma di circa 2,4 secondi.
 - Il driver installato è apparso in Core Audio con 6 ingressi e 8 uscite; una prova silenziosa di due secondi ha completato 535 cicli I/O.
+- Il test Core Audio con tono a 440 Hz ha completato 534 cicli I/O senza errori; l'ascolto sulle uscite analogiche 1–2 è ancora da confermare.
 
 ## Driver sperimentale
 
@@ -53,8 +54,13 @@ cmake --build build/cmake --parallel
 ./build/cmake/c600-engine-check
 ./build/cmake/c600-plugin-check ./build/cmake/FastTrackC600.driver/Contents/MacOS/FastTrackC600
 ./scripts/install.sh
+make build/c600-hal-io-check
+./build/c600-hal-io-check --tone
 ./scripts/uninstall.sh
 ```
+
+Il tono dura due secondi. Collegare le casse alle uscite analogiche 1–2 e
+iniziare con il volume di monitoraggio basso.
 
 Mancano ancora gestione della riconnessione, cambio frequenza e test di durata.
 Il buffer audio tra Core Audio e USB richiede una prova fisica di ascolto e
