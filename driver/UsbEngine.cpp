@@ -15,7 +15,7 @@ constexpr int ProductID = 0x2031;
 constexpr int AudioControlInterface = 1;
 constexpr int OutputInterface = 2;
 constexpr int InputInterface = 3;
-constexpr UInt16 MixerGain0dB = 0xfcfe;
+constexpr UInt16 MixerGainFull = 0xffff;
 
 bool propertyEquals(io_service_t service, CFStringRef key, int expected) {
     CFTypeRef property = IORegistryEntryCreateCFProperty(service, key, kCFAllocatorDefault, 0);
@@ -60,10 +60,10 @@ IOUSBInterfaceInterface300 **interfaceFor(int number) {
 }
 
 IOReturn controlRequest(IOUSBInterfaceInterface300 **iface,
-                        UInt8 direction, UInt16 value, UInt16 index,
+                        UInt8 direction, UInt8 recipient, UInt16 value, UInt16 index,
                         void* data, UInt16 length) {
     IOUSBDevRequestTO request = {};
-    request.bmRequestType = USBmakebmRequestType(direction, kUSBClass, kUSBInterface);
+    request.bmRequestType = USBmakebmRequestType(direction, kUSBClass, recipient);
     request.bRequest = 0x01; // UAC2 CUR
     request.wValue = value;
     request.wIndex = index;
@@ -186,26 +186,33 @@ void UsbEngine::WriteOutput(const float* source, size_t frames) noexcept {
 
 bool UsbEngine::SetClock() {
     UInt8 internalPin = 1;
-    IOReturn result = controlRequest(control_, kUSBOut, 0x0100,
+    IOReturn result = controlRequest(control_, kUSBOut, kUSBInterface, 0x0100,
                                      (0x80 << 8) | AudioControlInterface,
                                      &internalPin, sizeof(internalPin));
     if (result != kIOReturnSuccess) return false;
     UInt32 rate = SampleRate;
-    result = controlRequest(control_, kUSBOut, 0x0100,
+    result = controlRequest(control_, kUSBOut, kUSBInterface, 0x0100,
                             (0x81 << 8) | AudioControlInterface,
                             &rate, sizeof(rate));
     return result == kIOReturnSuccess;
 }
 
 bool UsbEngine::ConfigureMixer() {
-    // PCM channel n -> output n, at 0 dB. Other routes are left untouched.
+    // The C600 matrix uses zero-based output indices: 0x100 is return 1 ->
+    // mixer output 1, 0x109 is return 2 -> mixer output 2. A one-based
+    // offset here routes the stereo pair away from the physical 1-2 pair.
     for (unsigned channel = 0; channel < OutputChannels; ++channel) {
-        UInt16 gain = MixerGain0dB;
-        UInt16 selector = (UInt16)(0x0100 + channel * OutputChannels + channel + 1);
-        IOReturn result = controlRequest(control_, kUSBOut, selector,
+        UInt16 gain = MixerGainFull;
+        UInt16 selector = (UInt16)(0x0100 + channel * OutputChannels + channel);
+        // The mixer accepts SET_CUR as a class/device request, unlike the
+        // clock controls, which use class/interface requests.
+        IOReturn result = controlRequest(control_, kUSBOut, kUSBDevice, selector,
                                          (0x40 << 8) | AudioControlInterface,
                                          &gain, sizeof(gain));
-        if (result != kIOReturnSuccess) return false;
+        if (result != kIOReturnSuccess) {
+            std::fprintf(stderr, "C600 mixer SET 0x%04x failed: 0x%08x\n", selector, result);
+            return false;
+        }
     }
     return true;
 }

@@ -4,9 +4,9 @@
 
 Open development project for the M-Audio Fast Track C600 (`0763:2031`) on
 modern macOS. **Current status: the experimental Core Audio driver is installed
-and recognized on one M3 Pro Mac running macOS 15.6.1. Silent Core Audio input
-and output have passed a two-second test. Audible playback and microphone
-recording still need physical verification.**
+and recognized on one M3 Pro Mac running macOS 15.6.1. Audible playback through
+analog outputs 1–2 has been confirmed with a 440 Hz test tone and a macOS
+system sound. Microphone recording still needs physical verification.**
 
 ```sh
 make
@@ -52,9 +52,11 @@ has been tested so far. The C600 can run from USB power, but its analog inputs
    cmake --build build/cmake --parallel
    ```
 
-2. Install. Run this **without** `sudo`; the script copies the signed bundle to
-   a temporary location before asking for an administrator password. This
-   avoids macOS privacy restrictions on the Documents folder.
+2. Install or update. Run this **without** `sudo`; the script copies the signed
+   bundle to a temporary location before asking for an administrator password.
+   This avoids macOS privacy restrictions on the Documents folder. When
+   updating, the installer keeps the previous bundle until the new copy has
+   passed signature verification.
 
    ```sh
    ./scripts/install.sh
@@ -92,8 +94,10 @@ channels, 24-bit USB PCM converted to 32-bit float for Core Audio. The USB
 engine streamed about 2.4 seconds of full duplex audio with zero errors in a
 standalone test. The installed driver appears in Core Audio and completed 535
 silent I/O cycles in a two-second test, with nonempty input and output buffers.
-The 440 Hz output test also completed 534 callbacks without a Core Audio error;
-audibility has not yet been confirmed.
+After fixing the mixer's zero-based routing and USB request recipient, the
+440 Hz output test completed 534 callbacks without a Core Audio error and was
+heard from speakers connected to line outputs 1–2. A macOS system sound sent
+to the default output was also heard from those speakers.
 
 ```sh
 ./build/cmake/c600-engine-check   # hardware transport test, sends silence
@@ -101,12 +105,13 @@ audibility has not yet been confirmed.
 ```
 
 The driver currently lacks hot-plug handling, sample-rate switching, and
-long-session timing qualification. Its FIFO audio bridge needs a physical
-loopback test before recording or playback quality can be claimed. Use the
-uninstall script if Core Audio behaves unexpectedly.
+long-session timing qualification. Its FIFO audio bridge still needs physical
+recording and long playback tests before recording quality or sustained
+playback quality can be claimed. Use the uninstall script if Core Audio behaves
+unexpectedly.
 
-Next: validate the installed Core Audio driver with real playback and input,
-then test long-session timing, rate switching, and reconnect behavior. Firmware work
+Next: validate physical input recording, then test long-session timing, rate
+switching, and reconnect behavior. Firmware work
 is deferred until there is evidence of a firmware defect and a recovery path.
 
 ## Prior work and license

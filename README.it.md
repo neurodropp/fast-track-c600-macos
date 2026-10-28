@@ -4,8 +4,8 @@
 
 Progetto aperto per riportare la M-Audio Fast Track C600 su macOS moderno.
 **Stato attuale: il driver Core Audio sperimentale è installato e riconosciuto
-su un Mac M3 Pro con macOS 15.6.1. Ingresso e uscita silenziosi funzionano;
-l'audio udibile e la registrazione richiedono ancora una prova fisica.**
+su un Mac M3 Pro con macOS 15.6.1. La riproduzione udibile sulle uscite
+analogiche 1–2 è confermata; la registrazione richiede ancora una prova fisica.**
 
 ```sh
 make
@@ -21,7 +21,7 @@ l'audio. Con `--duplex` invia anche pacchetti di uscita silenziosi, sincronizzat
 al conteggio dei campioni in ingresso. Richiede la C600 collegata e non deve
 essere eseguito mentre un altro driver usa la scheda.
 
-## Stato della diagnosi (27 ottobre 2026)
+## Stato della diagnosi (28 ottobre 2026)
 
 Mac di prova: MacBook Pro M3 Pro, macOS 15.6.1, architettura arm64.
 Interfaccia: M-Audio Fast Track C600, USB VID:PID `0763:2031`, collegata tramite hub e alimentata solo via USB.
@@ -37,7 +37,8 @@ Interfaccia: M-Audio Fast Track C600, USB VID:PID `0763:2031`, collegata tramite
 - La prova duplex silenziosa ha ricevuto 15.992 pacchetti e inviato 15.968 pacchetti, senza errori. Il risultato si è ripetuto in tre esecuzioni consecutive.
 - Il motore USB usato dal driver ha ricevuto 19.440 pacchetti e inviato 19.424 pacchetti, senza errori, in una prova autonoma di circa 2,4 secondi.
 - Il driver installato è apparso in Core Audio con 6 ingressi e 8 uscite; una prova silenziosa di due secondi ha completato 535 cicli I/O.
-- Il test Core Audio con tono a 440 Hz ha completato 534 cicli I/O senza errori; l'ascolto sulle uscite analogiche 1–2 è ancora da confermare.
+- Il routing del mixer è stato corretto usando gli indici delle uscite a partire da zero e il destinatario USB richiesto per i comandi di scrittura.
+- Il tono Core Audio a 440 Hz e un suono di sistema macOS sono stati ascoltati dalle casse collegate alle uscite analogiche 1–2.
 
 ## Driver sperimentale
 
@@ -63,8 +64,8 @@ Il tono dura due secondi. Collegare le casse alle uscite analogiche 1–2 e
 iniziare con il volume di monitoraggio basso.
 
 Mancano ancora gestione della riconnessione, cambio frequenza e test di durata.
-Il buffer audio tra Core Audio e USB richiede una prova fisica di ascolto e
-registrazione prima di considerare il driver affidabile.
+Il buffer audio tra Core Audio e USB richiede ancora una prova di registrazione
+e prove di riproduzione prolungate prima di considerare il driver affidabile.
 
 Il kernel Linux include già il supporto per questa unità tramite una quirk USB audio: 8 uscite, 6 ingressi, 24 bit, 44,1/48/88,2/96 kHz e feedback implicito dal flusso di acquisizione. Questo conferma che il protocollo audio attuale è utilizzabile senza un firmware specifico per Apple Silicon.
 
