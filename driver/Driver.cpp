@@ -3,7 +3,10 @@
 
 #include <aspl/Driver.hpp>
 #include <CoreAudio/AudioServerPlugIn.h>
+#include <atomic>
+#include <chrono>
 #include <memory>
+#include <thread>
 
 namespace {
 
@@ -38,6 +41,50 @@ public:
 
 private:
     UsbEngine engine_;
+};
+
+class C600Hotplug final : public aspl::DriverRequestHandler {
+public:
+    C600Hotplug(std::shared_ptr<aspl::Plugin> plugin,
+               std::shared_ptr<C600Device> device)
+        : plugin_(std::move(plugin)), device_(std::move(device)) {}
+
+    ~C600Hotplug() override {
+        stopping_.store(true);
+        if (monitor_.joinable()) monitor_.join();
+    }
+
+    OSStatus OnInitialize() override {
+        if (started_.exchange(true)) return kAudioHardwareNoError;
+        bool present = UsbEngine::Present();
+        if (present) plugin_->AddDevice(device_);
+        try {
+            monitor_ = std::thread([this, present] {
+                bool listed = present;
+                while (!stopping_.load()) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                    if (stopping_.load()) break;
+                    bool connected = UsbEngine::Present();
+                    if (connected == listed) continue;
+                    if (connected) plugin_->AddDevice(device_);
+                    else plugin_->RemoveDevice(device_);
+                    listed = connected;
+                }
+            });
+        } catch (...) {
+            if (present) plugin_->RemoveDevice(device_);
+            started_.store(false);
+            return kAudioHardwareUnspecifiedError;
+        }
+        return kAudioHardwareNoError;
+    }
+
+private:
+    std::shared_ptr<aspl::Plugin> plugin_;
+    std::shared_ptr<C600Device> device_;
+    std::atomic<bool> started_{false};
+    std::atomic<bool> stopping_{false};
+    std::thread monitor_;
 };
 
 AudioStreamBasicDescription floatFormat(UInt32 channels) {
@@ -82,8 +129,9 @@ std::shared_ptr<aspl::Driver> createDriver() {
     device->SetControlHandler(handler);
     device->SetIOHandler(handler);
     auto plugin = std::make_shared<aspl::Plugin>(context);
-    plugin->AddDevice(device);
-    return std::make_shared<aspl::Driver>(context, plugin);
+    auto driver = std::make_shared<aspl::Driver>(context, plugin);
+    driver->SetDriverHandler(std::make_shared<C600Hotplug>(plugin, device));
+    return driver;
 }
 
 } // namespace

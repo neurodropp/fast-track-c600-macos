@@ -8,6 +8,10 @@ and recognized on one M3 Pro Mac running macOS 15.6.1. Audible playback through
 analog outputs 1–2 has been confirmed with a 440 Hz test tone and a macOS
 system sound. Microphone recording still needs physical verification.**
 
+The driver now removes the device from Core Audio when the USB cable is
+disconnected. Removal was verified on the test Mac; automatic reappearance
+after reconnection has not yet been tested.
+
 ```sh
 make
 ./build/c600-probe          # read-only USB descriptor and clock probe
@@ -104,8 +108,13 @@ to the default output was also heard from those speakers.
 ./build/cmake/c600-plugin-check ./build/cmake/FastTrackC600.driver/Contents/MacOS/FastTrackC600
 ```
 
-The driver currently lacks hot-plug handling, sample-rate switching, and
-long-session timing qualification. Its FIFO audio bridge still needs physical
+The driver checks USB presence every 500 ms and updates Core Audio's device
+list when the C600 connects or disconnects. With the USB cable disconnected,
+the C600 no longer appeared in the Core Audio device list and the HAL I/O
+check could not find it. Reconnection still needs a hardware test.
+
+The driver currently lacks sample-rate switching and long-session timing
+qualification. Its FIFO audio bridge still needs physical
 recording and long playback tests before recording quality or sustained
 playback quality can be claimed. Use the uninstall script if Core Audio behaves
 unexpectedly.

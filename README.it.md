@@ -7,6 +7,10 @@ Progetto aperto per riportare la M-Audio Fast Track C600 su macOS moderno.
 su un Mac M3 Pro con macOS 15.6.1. La riproduzione udibile sulle uscite
 analogiche 1–2 è confermata; la registrazione richiede ancora una prova fisica.**
 
+Con il cavo USB staccato la C600 non compare più nell'elenco di Core Audio.
+La rimozione è stata verificata; la ricomparsa automatica dopo il collegamento
+deve ancora essere provata.
+
 ```sh
 make
 ./build/c600-probe
@@ -63,7 +67,9 @@ make build/c600-hal-io-check
 Il tono dura due secondi. Collegare le casse alle uscite analogiche 1–2 e
 iniziare con il volume di monitoraggio basso.
 
-Mancano ancora gestione della riconnessione, cambio frequenza e test di durata.
+Il driver controlla la presenza USB ogni 500 ms e aggiorna l'elenco dei
+dispositivi Core Audio. La rimozione a cavo staccato è stata verificata; la
+riconnessione, il cambio frequenza e i test di durata restano da provare.
 Il buffer audio tra Core Audio e USB richiede ancora una prova di registrazione
 e prove di riproduzione prolungate prima di considerare il driver affidabile.
 
